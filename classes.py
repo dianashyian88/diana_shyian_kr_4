@@ -42,13 +42,6 @@ class HeadHunterAPI(API):
             v_hh.extend(response['items'])
         return v_hh
 
-    def save_all_vacancy(self):
-        """
-        Метод для сохранения полученного полного списка вакансий с сайта hh.ru в файле json
-        """
-        with open('all_vacancy.json', 'w') as file:
-            json.dump(self.get_vacancies(), file, indent=2, ensure_ascii=False)
-
     def get_formatted_vacancies(self):
         """
         Метод для получения отформатированного списка вакансий с сайта hh.ru
@@ -111,13 +104,6 @@ class SuperJobAPI(API):
             v_sj.extend(response['objects'])
         return v_sj
 
-    def save_all_vacancy(self):
-        """
-        Метод для сохранения полученного полного списка вакансий с сайта superjob.ru в файле json
-        """
-        with open('all_vacancy.json', 'w') as file:
-            json.dump(self.get_vacancies(), file, indent=2, ensure_ascii=False)
-
     def get_formatted_vacancies(self):
         """
         Метод для получения отформатированного списка вакансий с сайта superjob.ru
@@ -138,16 +124,6 @@ class SuperJobAPI(API):
         return formatted_v_sj
 
 
-class Saver(ABC):
-    """
-    Абстрактный класс для работы с файлом с вакансиями
-    """
-
-    @abstractmethod
-    def create_file(self, all_vacancies):
-        pass
-
-
 class Vacancy:
     """
     Класс для работы с вакансиями
@@ -155,17 +131,23 @@ class Vacancy:
     def __init__(self, vacancy):
         self.name = vacancy['name']
         self.url = vacancy['url']
-        self.salary_from = vacancy['salary_from']
-        self.salary_to = vacancy['salary_to']
+        if vacancy['salary_from'] is not None:
+            self.salary_from = vacancy['salary_from']
+        else:
+            self.salary_from = 0
+        if vacancy['salary_to'] is not None:
+            self.salary_to = vacancy['salary_to']
+        else:
+            self.salary_to = 0
         self.requirement = vacancy['requirement']
         self.experience = vacancy['experience']
         self.employment = vacancy['employment']
         self.source = vacancy['source']
-        if self.salary_from is not None and self.salary_from != 0 and self.salary_to is not None and self.salary_to != 0:
+        if self.salary_from != 0 and self.salary_to != 0:
             self.salary = str(self.salary_from) + '-' + str(self.salary_to)
-        elif self.salary_from is not None and self.salary_from != 0 and (self.salary_to is None or self.salary_to == 0):
+        elif self.salary_from != 0 and self.salary_to == 0:
             self.salary = str(self.salary_from)
-        elif (self.salary_from is None or self.salary_from == 0) and self.salary_to is not None and self.salary_to != 0:
+        elif self.salary_from == 0 and self.salary_to != 0:
             self.salary = str(self.salary_to)
         else:
             self.salary = 'Не указана'
@@ -180,6 +162,36 @@ class Vacancy:
 Источник: {self.source}
 """
 
+    def __gt__(self, other):
+        """
+        Метод определяет поведение оператора больше
+        """
+        return self.salary_from > other.salary_from
+
+    def __lt__(self, other):
+        """
+        Метод определяет поведение оператора меньше
+        """
+        return self.salary_from < other.salary_from
+
+
+class Saver(ABC):
+    """
+    Абстрактный класс для работы с файлом с вакансиями
+    """
+
+    @abstractmethod
+    def create_file(self, all_vacancies):
+        pass
+
+    @abstractmethod
+    def select_file(self):
+        pass
+
+    @abstractmethod
+    def delete_vacancy(self):
+        pass
+
 
 class JSONSaver(Saver):
     """
@@ -190,11 +202,58 @@ class JSONSaver(Saver):
         self.create_file(all_vacancies)
 
     def create_file(self, all_vacancies):
+        """
+        Метод для сохранения отформатированного списка вакансий в json-файл
+        """
         with open(f'data/{self.filename}', 'w') as file:
             json.dump(all_vacancies, file, indent=2, ensure_ascii=False)
 
     def select_file(self):
+        """
+        Метод для получения полного списка вакансий из json-файла
+        """
         with open(f'data/{self.filename}', 'r') as file:
             data = json.load(file)
         vacancy_data = [Vacancy(x) for x in data]
         return vacancy_data
+
+    def sorted_by_salary(self):
+        """
+        Метод для получения из json-файла списка вакансий, отсортированных по убыванию заработной платы
+        """
+        vacancy_data = self.select_file()
+        sorted_vacancy_data = sorted(vacancy_data, key=lambda vacancy: vacancy.salary_from, reverse=True)
+        return sorted_vacancy_data
+
+    def get_top_10_vacancy(self):
+        """
+        Метод для получения из json-файла десяти вакансий, с наибольшим размером заработной платы
+        """
+        sorted_vacancy_data = self.sorted_by_salary()
+        return sorted_vacancy_data[:5]
+
+    def get_vacancy_full_emp(self):
+        """
+        Метод для получения из json-файла вакансий с полной занятостью
+        """
+        full_emp_vacancy_data = []
+        sorted_vacancy_data = self.sorted_by_salary()
+        for vacancy in sorted_vacancy_data:
+            if vacancy.employment == 'Полная занятость' or vacancy.employment == 'Полный рабочий день':
+                full_emp_vacancy_data.append(vacancy)
+        return full_emp_vacancy_data
+
+    def delete_vacancy(self):
+        """
+        Метод для удаления из json-файла вакансий с незаполненной или нулевой заработной платой
+        """
+        update_vacancy_data = []
+        with open(f'data/{self.filename}', 'r') as file:
+            data = json.load(file)
+        for item in data:
+            if item['salary_from'] is not None and item['salary_from'] != 0:
+                update_vacancy_data.append(item)
+            elif item['salary_to'] is not None and item['salary_to'] != 0:
+                update_vacancy_data.append(item)
+        self.create_file(update_vacancy_data)
+        return self.select_file()
