@@ -2,6 +2,7 @@ from abc import ABC, abstractmethod
 import requests
 import json
 import os
+from datetime import datetime
 
 
 class API(ABC):
@@ -54,10 +55,12 @@ class HeadHunterAPI(API):
                     'url': vacancy['alternate_url'],
                     'salary_from': vacancy['salary']['from'],
                     'salary_to': vacancy['salary']['to'],
-                    'salary_cur': vacancy['salary']['currency'].upper(),
+                    'salary_cur': vacancy['salary']['currency'].lower(),
+                    'employer': vacancy['employer']['name'],
                     'requirement': vacancy['snippet']['requirement'],
                     'experience': vacancy['experience']['name'],
                     'employment': vacancy['employment']['name'],
+                    'area': vacancy['area']['name'],
                     'source': 'hh.ru'
                 })
             except TypeError:
@@ -67,9 +70,11 @@ class HeadHunterAPI(API):
                     'salary_from': None,
                     'salary_to': None,
                     'salary_cur': None,
+                    'employer': vacancy['employer']['name'],
                     'requirement': vacancy['snippet']['requirement'],
                     'experience': vacancy['experience']['name'],
                     'employment': vacancy['employment']['name'],
+                    'area': vacancy['area']['name'],
                     'source': 'hh.ru'
                 })
         return formatted_v_hh
@@ -115,10 +120,12 @@ class SuperJobAPI(API):
                 'url': vacancy['link'],
                 'salary_from': vacancy['payment_from'],
                 'salary_to': vacancy['payment_to'],
-                'salary_cur': vacancy['currency'].upper(),
+                'salary_cur': vacancy['currency'].lower(),
+                'employer': vacancy['firm_name'],
                 'requirement': vacancy['candidat'],
                 'experience': vacancy['experience']['title'],
                 'employment': vacancy['type_of_work']['title'],
+                'area': vacancy['town']['title'],
                 'source': 'superjob.ru'
             })
         return formatted_v_sj
@@ -131,20 +138,35 @@ class Vacancy:
     def __init__(self, vacancy):
         self.name = vacancy['name']
         self.url = vacancy['url']
-        if vacancy['salary_from'] is not None:
-            self.salary_from = vacancy['salary_from']
+        if vacancy['salary_from'] is not None and vacancy['salary_cur'] is not None:
+            if vacancy['salary_cur'] == 'rur':
+                self.salary_from = vacancy['salary_from']
+            else:
+                self.salary_from = round(vacancy['salary_from'] / self.get_currency_rate(vacancy['salary_cur']))
+        elif vacancy['salary_from'] is None and vacancy['salary_to'] is not None and vacancy['salary_cur'] is not None:
+            if vacancy['salary_cur'] == 'rur':
+                self.salary_from = vacancy['salary_to']
+            else:
+                self.salary_from = round(vacancy['salary_to'] / self.get_currency_rate(vacancy['salary_cur']))
         else:
             self.salary_from = 0
-        if vacancy['salary_to'] is not None:
-            self.salary_to = vacancy['salary_to']
+        if vacancy['salary_to'] is not None and vacancy['salary_cur'] is not None:
+            if vacancy['salary_cur'] == 'rur':
+                self.salary_to = vacancy['salary_to']
+            else:
+                self.salary_to = round(vacancy['salary_to'] / self.get_currency_rate(vacancy['salary_cur']))
         else:
             self.salary_to = 0
+        self.employer = vacancy['employer']
         self.requirement = vacancy['requirement']
         self.experience = vacancy['experience']
         self.employment = vacancy['employment']
+        self.area = vacancy['area']
         self.source = vacancy['source']
-        if self.salary_from != 0 and self.salary_to != 0:
+        if self.salary_from != 0 and self.salary_to != 0 and self.salary_from != self.salary_to:
             self.salary = str(self.salary_from) + '-' + str(self.salary_to)
+        elif self.salary_from != 0 and self.salary_to != 0 and self.salary_from == self.salary_to:
+            self.salary = str(self.salary_from)
         elif self.salary_from != 0 and self.salary_to == 0:
             self.salary = str(self.salary_from)
         elif self.salary_from == 0 and self.salary_to != 0:
@@ -156,11 +178,23 @@ class Vacancy:
         return f"""Наименование вакансии: {self.name}
 Ссылка на вакансию: {self.url}
 Заработная плата в рос. рублях: {self.salary}
+Работодатель: {self.employer}
 Описание вакансии: {self.requirement}
 Требования к опыту работы: {self.experience}
 Тип занятости: {self.employment}
+Местоположение: {self.area}
 Источник: {self.source}
 """
+
+    def get_currency_rate(self, currency):
+        """
+        Метод для получения курса валюты заработной платы к российскому рублю
+        """
+        current_date = datetime.now().date()
+        url = 'https://cdn.jsdelivr.net/gh/fawazahmed0/currency-api@1/' + str(current_date) + '/currencies/rub.json'
+        response = requests.get(url).json()
+        currency_rate = response['rub'][currency]
+        return currency_rate
 
     def __gt__(self, other):
         """
