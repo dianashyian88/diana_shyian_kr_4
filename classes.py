@@ -31,11 +31,11 @@ class HeadHunterAPI(API):
         Метод для получения списка вакансий с сайта hh.ru
         """
         v_hh = []
-        for page in range(1, 3):
+        for page in range(1, 11):
             url = 'https://api.hh.ru/vacancies'
             params = {
                 'page': page,
-                'per_page': 2,
+                'per_page': 100,
                 'text': self.keyword,
                 'type': 'open'
             }
@@ -94,10 +94,10 @@ class SuperJobAPI(API):
         Метод для получения списка вакансий с сайта superjob.ru
         """
         v_sj = []
-        for page in range(1, 3):
+        for page in range(1, 11):
             url = 'https://api.superjob.ru/2.0/vacancies'
             params = {
-                'count': 2,
+                'count': 100,
                 'page': page,
                 'keyword': self.keyword,
                 'archive': False
@@ -186,7 +186,8 @@ class Vacancy:
 Источник: {self.source}
 """
 
-    def get_currency_rate(self, currency):
+    @staticmethod
+    def get_currency_rate(currency):
         """
         Метод для получения курса валюты заработной платы к российскому рублю
         """
@@ -239,14 +240,14 @@ class JSONSaver(Saver):
         """
         Метод для сохранения отформатированного списка вакансий в json-файл
         """
-        with open(f'data/{self.filename}', 'w') as file:
+        with open(f'data/{self.filename}', 'w', encoding='utf-8') as file:
             json.dump(all_vacancies, file, indent=2, ensure_ascii=False)
 
     def select_file(self):
         """
         Метод для получения полного списка вакансий из json-файла
         """
-        with open(f'data/{self.filename}', 'r') as file:
+        with open(f'data/{self.filename}', 'r', encoding='utf-8') as file:
             data = json.load(file)
         vacancy_data = [Vacancy(x) for x in data]
         return vacancy_data
@@ -261,10 +262,10 @@ class JSONSaver(Saver):
 
     def get_top_10_vacancy(self):
         """
-        Метод для получения из json-файла десяти вакансий, с наибольшим размером заработной платы
+        Метод для получения из json-файла десяти вакансий с наибольшим размером заработной платы
         """
         sorted_vacancy_data = self.sorted_by_salary()
-        return sorted_vacancy_data[:5]
+        return sorted_vacancy_data[:10]
 
     def get_vacancy_full_emp(self):
         """
@@ -290,4 +291,4 @@ class JSONSaver(Saver):
             elif item['salary_to'] is not None and item['salary_to'] != 0:
                 update_vacancy_data.append(item)
         self.create_file(update_vacancy_data)
-        return self.select_file()
+        return self.sorted_by_salary()
