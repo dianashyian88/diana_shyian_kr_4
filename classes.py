@@ -138,41 +138,15 @@ class Vacancy:
     def __init__(self, vacancy):
         self.name = vacancy['name']
         self.url = vacancy['url']
-        if vacancy['salary_from'] is not None and vacancy['salary_cur'] is not None:
-            if vacancy['salary_cur'] == 'rur':
-                self.salary_from = vacancy['salary_from']
-            else:
-                self.salary_from = round(vacancy['salary_from'] / self.get_currency_rate(vacancy['salary_cur']))
-        elif vacancy['salary_from'] is None and vacancy['salary_to'] is not None and vacancy['salary_cur'] is not None:
-            if vacancy['salary_cur'] == 'rur':
-                self.salary_from = vacancy['salary_to']
-            else:
-                self.salary_from = round(vacancy['salary_to'] / self.get_currency_rate(vacancy['salary_cur']))
-        else:
-            self.salary_from = 0
-        if vacancy['salary_to'] is not None and vacancy['salary_cur'] is not None:
-            if vacancy['salary_cur'] == 'rur':
-                self.salary_to = vacancy['salary_to']
-            else:
-                self.salary_to = round(vacancy['salary_to'] / self.get_currency_rate(vacancy['salary_cur']))
-        else:
-            self.salary_to = 0
+        self.salary_from = self.get_salary_from(vacancy)
+        self.salary_to = self.get_salary_to(vacancy)
+        self.salary = self.get_salary(self.salary_from, self.salary_to)
         self.employer = vacancy['employer']
         self.requirement = vacancy['requirement']
         self.experience = vacancy['experience']
         self.employment = vacancy['employment']
         self.area = vacancy['area']
         self.source = vacancy['source']
-        if self.salary_from != 0 and self.salary_to != 0 and self.salary_from != self.salary_to:
-            self.salary = str(self.salary_from) + '-' + str(self.salary_to)
-        elif self.salary_from != 0 and self.salary_to != 0 and self.salary_from == self.salary_to:
-            self.salary = str(self.salary_from)
-        elif self.salary_from != 0 and self.salary_to == 0:
-            self.salary = str(self.salary_from)
-        elif self.salary_from == 0 and self.salary_to != 0:
-            self.salary = str(self.salary_to)
-        else:
-            self.salary = 'Не указана'
 
     def __str__(self):
         return f"""Наименование вакансии: {self.name}
@@ -185,6 +159,54 @@ class Vacancy:
 Местоположение: {self.area}
 Источник: {self.source}
 """
+
+    def get_salary_from(self, vacancy):
+        """
+        Метод для определения salary_from в российских рублях
+        """
+        if vacancy['salary_from'] is not None and vacancy['salary_cur'] is not None:
+            if vacancy['salary_cur'] == 'rur':
+                salary_from = vacancy['salary_from']
+            else:
+                salary_from = round(vacancy['salary_from'] / self.get_currency_rate(vacancy['salary_cur']))
+        elif vacancy['salary_from'] is None and vacancy['salary_to'] is not None and vacancy['salary_cur'] is not None:
+            if vacancy['salary_cur'] == 'rur':
+                salary_from = vacancy['salary_to']
+            else:
+                salary_from = round(vacancy['salary_to'] / self.get_currency_rate(vacancy['salary_cur']))
+        else:
+            salary_from = 0
+        return salary_from
+
+    def get_salary_to(self, vacancy):
+        """
+        Метод для определения salary_to в российских рублях
+        """
+        if vacancy['salary_to'] is not None and vacancy['salary_cur'] is not None:
+            if vacancy['salary_cur'] == 'rur':
+                salary_to = vacancy['salary_to']
+            else:
+                salary_to = round(vacancy['salary_to'] / self.get_currency_rate(vacancy['salary_cur']))
+        else:
+            salary_to = 0
+        return salary_to
+
+    @staticmethod
+    def get_salary(salary_from, salary_to):
+        """
+        Метод для определения salary в российских рублях в удобном для пользователя формате
+        """
+        if salary_from != 0 and salary_to != 0 and salary_from != salary_to:
+            salary = str(salary_from) + '-' + str(salary_to)
+        elif salary_from != 0 and salary_to != 0 and salary_from == salary_to:
+            salary = str(salary_from)
+        elif salary_from != 0 and salary_to == 0:
+            salary = str(salary_from)
+        elif salary_from == 0 and salary_to != 0:
+            salary = str(salary_to)
+        else:
+            salary = 'Не указана'
+        return salary
 
     @staticmethod
     def get_currency_rate(currency):
